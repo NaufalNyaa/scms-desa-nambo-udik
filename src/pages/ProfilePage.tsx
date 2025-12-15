@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, CreditCard, ArrowLeft, Camera, Save, X, Shield, Calendar } from 'lucide-react';
+import { User, Mail, Phone, MapPin, CreditCard, ArrowLeft, Camera, Save, X, Shield, Calendar, Edit2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 
-export default function ProfilePage() {
-  const { user, profile, refreshProfile } = useAuth();
+interface ProfilePageProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function ProfilePage({ onNavigate }: ProfilePageProps) {
+  const { user, profile, refreshProfile, isAdmin } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     email: '',
@@ -77,7 +81,6 @@ export default function ProfilePage() {
     try {
       let avatarUrl = editData.avatar_url;
 
-      // Upload avatar jika ada gambar baru
       if (imageFile) {
         const uploadedUrl = await uploadAvatar(imageFile);
         if (uploadedUrl) {
@@ -87,7 +90,6 @@ export default function ProfilePage() {
         }
       }
 
-      // Update profile di database
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -98,7 +100,6 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
-      // Update email jika berbeda
       if (editData.email !== user?.email) {
         const { error: emailError } = await supabase.auth.updateUser({
           email: editData.email
@@ -133,6 +134,12 @@ export default function ProfilePage() {
     setError('');
   };
 
+  const handleBackToDashboard = () => {
+    if (onNavigate) {
+      onNavigate(isAdmin ? 'admin-dashboard' : 'dashboard');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
       day: 'numeric',
@@ -154,212 +161,238 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navbar currentPage="profile" onNavigate={(page) => window.location.href = `#${page}`} />
+      <Navbar currentPage="profile" onNavigate={onNavigate || (() => {})} />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Back Button */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
         <button
-          onClick={() => window.history.back()}
-          className="flex items-center space-x-2 mb-6 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+          onClick={handleBackToDashboard}
+          className="flex items-center space-x-2 mb-6 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors group"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Kembali ke Dashboard</span>
         </button>
 
         {/* Alert Messages */}
         {success && (
-          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center space-x-3">
+          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center space-x-3 animate-fade-in">
             <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
               <span className="text-white text-lg">✓</span>
             </div>
-            <p className="text-green-800 dark:text-green-200">{success}</p>
+            <p className="text-green-800 dark:text-green-200 font-medium">{success}</p>
           </div>
         )}
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center space-x-3">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center space-x-3 animate-fade-in">
             <X className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-            <p className="text-red-800 dark:text-red-200">{error}</p>
+            <p className="text-red-800 dark:text-red-200 font-medium">{error}</p>
           </div>
         )}
 
-        {/* Profile Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
-          {/* Header Section */}
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-8 py-12 relative">
-            <div className="absolute top-4 right-4">
-              <span className="px-3 py-1 bg-white/30 backdrop-blur-sm text-white text-sm font-medium rounded-full capitalize">
-                {profile.role === 'admin' ? 'Admin' : 'Warga'}
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Profil Saya</h1>
-            <p className="text-emerald-50">Kelola informasi profil Anda</p>
-          </div>
-
-          <div className="px-8 py-8">
-            {/* Avatar Section */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-8 pb-8 border-b dark:border-gray-700">
-              <div className="relative">
-                <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-500 p-1">
-                  <img
-                    src={previewImage || editData.avatar_url}
-                    alt={profile.full_name}
-                    className="w-full h-full rounded-full object-cover bg-white dark:bg-gray-700"
-                  />
-                </div>
-                {isEditing && (
-                  <label className="absolute bottom-0 right-0 w-10 h-10 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110">
-                    <Camera className="h-5 w-5 text-white" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  {profile.full_name}
-                </h2>
-                <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm">NIK: {profile.nik}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 mt-1">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">Bergabung: {formatDate(profile.created_at)}</span>
-                </div>
-              </div>
-
-              {!isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
-                >
-                  Edit Profil
-                </button>
-              )}
-            </div>
-
-            {/* Information Grid */}
-            <div className="space-y-6">
-              {/* NIK - Read Only */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Nomor Induk Kependudukan (NIK)
-                </label>
-                <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <CreditCard className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                  <span className="font-mono text-gray-900 dark:text-gray-200">{profile.nik}</span>
-                  <span className="ml-auto px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded">
-                    Tidak dapat diubah
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left Sidebar - Profile Card */}
+          <div className="lg:col-span-1">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden sticky top-24">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-8 text-center relative">
+                <div className="absolute top-4 right-4">
+                  <span className="px-3 py-1 bg-white/30 backdrop-blur-sm text-white text-xs font-medium rounded-full capitalize flex items-center space-x-1">
+                    <Shield className="h-3 w-3" />
+                    <span>{profile.role === 'admin' ? 'Admin' : 'Warga'}</span>
                   </span>
                 </div>
+
+                {/* Avatar */}
+                <div className="relative inline-block">
+                  <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-500 p-1 shadow-xl">
+                    <img
+                      src={previewImage || editData.avatar_url}
+                      alt={profile.full_name}
+                      className="w-full h-full rounded-full object-cover bg-white dark:bg-gray-700"
+                    />
+                  </div>
+                  {isEditing && (
+                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110">
+                      <Camera className="h-5 w-5 text-white" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <h2 className="text-2xl font-bold text-white mt-4">
+                  {profile.full_name}
+                </h2>
+                <p className="text-emerald-50 text-sm mt-1">
+                  {user?.email}
+                </p>
               </div>
 
-              {/* Email - Editable */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Alamat Email
-                </label>
-                {isEditing ? (
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 dark:text-gray-400" />
+              {/* Quick Info */}
+              <div className="p-6 space-y-4">
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <CreditCard className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">NIK</p>
+                    <p className="font-mono text-gray-900 dark:text-white font-semibold">{profile.nik}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 text-sm">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs">Bergabung</p>
+                    <p className="text-gray-900 dark:text-white font-semibold">{formatDate(profile.created_at)}</p>
+                  </div>
+                </div>
+
+                {!isEditing && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="w-full mt-4 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                  >
+                    <Edit2 className="h-5 w-5" />
+                    <span>Edit Profil</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Content - Profile Details */}
+          <div className="lg:col-span-2">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                Informasi Profil
+              </h3>
+
+              <div className="space-y-6">
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Mail className="h-4 w-4" />
+                      <span>Alamat Email</span>
+                    </div>
+                  </label>
+                  {isEditing ? (
                     <input
                       type="email"
                       value={editData.email}
                       onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                       placeholder="email@example.com"
                     />
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <Mail className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-900 dark:text-gray-200">{user?.email}</span>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <span className="text-gray-900 dark:text-gray-200">{user?.email}</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Phone - Editable */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Nomor Telepon / WhatsApp
-                </label>
-                {isEditing ? (
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 dark:text-gray-400" />
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Phone className="h-4 w-4" />
+                      <span>Nomor Telepon / WhatsApp</span>
+                    </div>
+                  </label>
+                  {isEditing ? (
                     <input
                       type="tel"
                       value={editData.phone}
                       onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                       placeholder="0812-3456-7890"
                     />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <span className="text-gray-900 dark:text-gray-200">{profile.phone || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* NIK - Read Only */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="h-4 w-4" />
+                      <span>Nomor Induk Kependudukan (NIK)</span>
+                    </div>
+                  </label>
+                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 flex items-center justify-between">
+                    <span className="font-mono text-gray-900 dark:text-gray-200">{profile.nik}</span>
+                    <span className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded">
+                      Tidak dapat diubah
+                    </span>
                   </div>
-                ) : (
-                  <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <Phone className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-900 dark:text-gray-200">{profile.phone || '-'}</span>
+                </div>
+
+                {/* Address - Read Only */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>Alamat Lengkap</span>
+                    </div>
+                  </label>
+                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 flex items-start justify-between">
+                    <span className="text-gray-900 dark:text-gray-200">{profile.address}</span>
+                    <span className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded whitespace-nowrap ml-2">
+                      Tidak dapat diubah
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                {isEditing && (
+                  <div className="flex space-x-4 pt-6 border-t dark:border-gray-700">
+                    <button
+                      onClick={handleSave}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                    >
+                      <Save className="h-5 w-5" />
+                      <span>{loading ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      disabled={loading}
+                      className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-all"
+                    >
+                      Batal
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Address - Read Only */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Alamat Lengkap
-                </label>
-                <div className="flex items-start space-x-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <MapPin className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-900 dark:text-gray-200">{profile.address}</span>
-                  <span className="ml-auto px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded whitespace-nowrap">
-                    Tidak dapat diubah
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              {isEditing && (
-                <div className="flex space-x-4 pt-4">
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                  >
-                    <Save className="h-5 w-5" />
-                    <span>{loading ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-                  </button>
-                  <button
-                    onClick={handleCancel}
-                    disabled={loading}
-                    className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-semibold transition-all"
-                  >
-                    Batal
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Info Box */}
-            <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
-                  <span className="text-white text-xs">ℹ</span>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-900 dark:text-blue-200 font-semibold mb-1">
-                    Informasi Penting
-                  </p>
-                  <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-                    <li>• Data NIK dan Alamat tidak dapat diubah untuk keamanan data</li>
-                    <li>• Untuk mengubah NIK atau Alamat, hubungi admin desa</li>
-                    <li>• Foto profil maksimal 2MB (format: JPG, PNG)</li>
-                    <li>• Pastikan nomor telepon aktif untuk notifikasi laporan</li>
-                  </ul>
+              {/* Info Box */}
+              <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="text-white text-xs">ℹ</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-900 dark:text-blue-200 font-semibold mb-1">
+                      Informasi Penting
+                    </p>
+                    <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                      <li>• Data NIK dan Alamat tidak dapat diubah untuk keamanan data</li>
+                      <li>• Untuk mengubah NIK atau Alamat, hubungi admin desa</li>
+                      <li>• Foto profil maksimal 2MB (format: JPG, PNG)</li>
+                      <li>• Pastikan nomor telepon aktif untuk notifikasi laporan</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
