@@ -44,7 +44,7 @@ Sebelum memulai, pastikan Anda sudah menginstal:
 ### 1. Clone Repository
 
 ```bash
-git clone [LINK_GITHUB_ANDA]
+git clone https://github.com/NaufalNyaa/scms-desa-nambo-udik.git
 cd scms-desa-nambo-udik
 ```
 
@@ -242,3 +242,4 @@ Dikembangkan dengan ❤️ untuk Desa Nambo Udik
 **Link Repository**: [https://github.com/NaufalNyaa/smcs-desa-nambo-udik.git]
 
 Untuk pertanyaan dan bantuan, silakan buat issue di repository GitHub.
+
