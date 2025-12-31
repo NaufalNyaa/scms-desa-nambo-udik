@@ -214,7 +214,7 @@ export default function AdminComplaintDetail({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navbar currentPage="all-complaints" onNavigate={onNavigate} />
+      <Navbar currentPage="admin-complaint-detail" onNavigate={onNavigate} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button

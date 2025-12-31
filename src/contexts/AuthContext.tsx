@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, retries = 3) => {
     try {
       console.log('🔍 Fetching profile for user:', userId);
 
@@ -79,7 +79,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (error) {
-        console.error('❌ Error fetching profile:', error);
+        // Jika profil tidak ditemukan, coba buat profil baru
+        if (error.code === 'PGRST116' && retries > 0) {
+          console.log('⚠️ Profile not found, waiting for trigger... Retries left:', retries);
+
+          // Tunggu 1 detik untuk trigger bekerja
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Coba lagi
+          return fetchProfile(userId, retries - 1);
+        }
+
         throw error;
       }
 
@@ -89,14 +99,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data as UserProfile);
     } catch (error) {
       console.error('❌ Error in fetchProfile:', error);
+
+      // Jika masih gagal, coba buat profil secara manual
+      if (retries === 0) {
+        console.log('🔧 Attempting to create profile manually...');
+        await createProfileManually(userId);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const createProfileManually = async (userId: string) => {
+    try {
+      // Ambil data user dari auth.users
+      const { data: authUser } = await supabase.auth.getUser();
+
+      if (!authUser.user) return;
+
+      const metadata = authUser.user.user_metadata;
+
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          full_name: metadata?.full_name || authUser.user.email || 'User',
+          nik: metadata?.nik || '0000000000000000',
+          address: metadata?.address || 'Belum diisi',
+          phone: metadata?.phone || null,
+          role: 'user',
+          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(metadata?.full_name || authUser.user.email || 'User')}&background=10b981&color=fff&size=200`
+        });
+
+      if (error) {
+        console.error('❌ Failed to create profile manually:', error);
+        return;
+      }
+
+      console.log('✅ Profile created manually, fetching...');
+      await fetchProfile(userId, 0); // Fetch tanpa retry
+    } catch (error) {
+      console.error('❌ Error creating profile manually:', error);
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user.id, 0); // Fetch tanpa retry
     }
   };
 
@@ -122,10 +171,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (data: SignUpData) => {
     try {
-      // Step 1: Sign up with Supabase Auth
+      console.log('📝 Starting signup process...');
+
+      // Step 1: Sign up with Supabase Auth (dengan metadata)
       const { error: signUpError, data: authData } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
+        options: {
+          data: {
+            full_name: data.full_name,
+            nik: data.nik,
+            address: data.address,
+            phone: data.phone || '',
+            role: 'user'
+          }
+        }
       });
 
       if (signUpError) throw signUpError;
@@ -134,30 +194,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('User creation failed');
       }
 
-      // Step 2: Insert into users table
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: data.email,
-          full_name: data.full_name,
-          nik: data.nik,
-          address: data.address,
-          phone: data.phone || '',
-          role: 'user', // Default role
-        });
+      console.log('✅ User created in auth.users:', authData.user.id);
 
-      if (insertError) {
-        console.error('Error inserting user profile:', insertError);
-        throw insertError;
-      }
+      // Step 2: Tunggu trigger bekerja (1-2 detik)
+      console.log('⏳ Waiting for trigger to create profile...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Step 3: Fetch the profile
+      // Step 3: Fetch profile (dengan retry mechanism)
+      console.log('🔍 Fetching newly created profile...');
       await fetchProfile(authData.user.id);
 
       return { error: null };
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('❌ Signup error:', error);
       return { error: error as Error };
     }
   };
